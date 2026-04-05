@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0f14" />
+  <title>ICT Signal Engine PWA</title>
+  <link rel="manifest" href="./manifest.json" />
+  <style>
+    :root{
+      --bg:#0b0f14; --card:#121821; --card2:#0f151d; --border:#1d2633;
+      --gold:#d2b15f; --txt:#eef3fb; --muted:#93a1b7; --green:#35d07f;
+      --red:#ef5d6b; --blue:#4f9de6;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);font-family:Arial,Helvetica,sans-serif}
+    body{padding:16px}
+    .wrap{max-width:1100px;margin:0 auto}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:14px}
+    h1,h2,h3,p{margin:0 0 10px}
+    h1{font-size:28px}
+    h2{font-size:20px;color:var(--gold)}
+    .muted{color:var(--muted)}
+    .grid{display:grid;gap:12px}
+    .grid-2{grid-template-columns:repeat(2,1fr)}
+    .grid-3{grid-template-columns:repeat(3,1fr)}
+    .grid-4{grid-template-columns:repeat(4,1fr)}
+    .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    .field input,.field select{
+      width:100%;background:var(--card2);color:var(--txt);
+      border:1px solid var(--border);border-radius:12px;padding:12px
+    }
+    .btns{display:flex;gap:10px;flex-wrap:wrap}
+    button{
+      background:linear-gradient(135deg,#e5ca80,var(--gold));
+      color:#111;border:none;border-radius:12px;padding:12px 16px;
+      font-weight:700;cursor:pointer
+    }
+    button.ghost{
+      background:var(--card2);color:var(--txt);border:1px solid var(--border)
+    }
+    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    .kpi{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:14px}
+    .kpi small{display:block;color:var(--muted);margin-bottom:8px}
+    .kpi b{font-size:20px}
+    .good{color:var(--green)} .bad{color:var(--red)} .info{color:var(--blue)}
+    .log{
+      font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+      white-space:pre-wrap;line-height:1.65;font-size:14px
+    }
+    .pill{display:inline-block;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700}
+    .pill-buy{background:rgba(53,208,127,.12);color:var(--green);border:1px solid rgba(53,208,127,.25)}
+    .pill-sell{background:rgba(239,93,107,.12);color:var(--red);border:1px solid rgba(239,93,107,.25)}
+    .pill-wait{background:rgba(79,157,230,.12);color:var(--blue);border:1px solid rgba(79,157,230,.25)}
+    .status{font-size:12px;color:var(--muted)}
+    .tiny{font-size:11px;color:var(--muted)}
+    @media (max-width:900px){.grid-2,.grid-3,.grid-4,.kpis{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>ICT Signal Engine</h1>
+    <p class="muted">PWA version for GitHub Pages / mobile install. Enter your TwelveData API key once; it will be saved on your device only.</p>
+    <div class="status" id="pwaStatus">PWA status: checking…</div>
+  </div>
+
+  <div class="card">
+    <h2>Setup</h2>
+    <div class="grid grid-2">
+      <div class="field">
+        <label>TwelveData API Key</label>
+        <input id="apiKey" type="password" placeholder="Paste your API key" />
+      </div>
+      <div class="field">
+        <label>Symbol</label>
+        <select id="symbol">
+          <option value="XAU/USD">XAU/USD</option>
+          <option value="EUR/USD">EUR/USD</option>
+          <option value="GBP/USD">GBP/USD</option>
+          <option value="USD/JPY">USD/JPY</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Interval</label>
+        <select id="interval">
+          <option value="1min">1min</option>
+          <option value="5min">5min</option>
+          <option value="15min">15min</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Mode</label>
+        <select id="riskMode">
+          <option value="sniper">Sniper</option>
+          <option value="balanced">Balanced</option>
+        </select>
+      </div>
+    </div>
+    <div class="btns" style="margin-top:14px">
+      <button id="saveKeyBtn">Save Key</button>
+      <button id="runBtn">Run Analysis</button>
+      <button class="ghost" id="autoBtn">Auto Refresh</button>
+      <button class="ghost" id="stopBtn">Stop</button>
+    </div>
+    <div class="tiny" id="usageNote" style="margin-top:10px">Uses smart refresh: 60s for 1min, 180s for 5min, 300s for 15min.</div>
+  </div>
+
+  <div class="card">
+    <h2>Signal</h2>
+    <div class="kpis">
+      <div class="kpi"><small>Decision</small><b id="decision">—</b></div>
+      <div class="kpi"><small>Direction</small><b id="direction">—</b></div>
+      <div class="kpi"><small>Confidence</small><b id="confidence">—</b></div>
+      <div class="kpi"><small>Score</small><b id="score">—</b></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Trade Plan</h2>
+    <div class="kpis">
+      <div class="kpi"><small>Entry</small><b id="entry">—</b></div>
+      <div class="kpi"><small>Stop Loss</small><b id="sl">—</b></div>
+      <div class="kpi"><small>Take Profit</small><b id="tp">—</b></div>
+      <div class="kpi"><small>RR</small><b id="rr">—</b></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Market Read</h2>
+    <div class="log" id="details">Waiting…</div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'ict_pwa_td_key';
+let loopId = null;
+
+function $(id){ return document.getElementById(id); }
+function num(v){ return Number(v||0); }
+function fmt(v){ return (v===null || v===undefined || Number.isNaN(v)) ? '—' : Number(v).toFixed(3); }
+
+function loadKey(){
+  const k = localStorage.getItem(STORAGE_KEY) || '';
+  $('apiKey').value = k;
+}
+function saveKey(){
+  localStorage.setItem(STORAGE_KEY, $('apiKey').value.trim());
+  $('usageNote').textContent = 'API key saved locally on this device.';
+}
+function minRefreshMs(){
+  const tf = $('interval').value;
+  if(tf === '1min') return 60000;
+  if(tf === '5min') return 180000;
+  return 300000;
+}
+
+async function fetchCandles(){
+  const apiKey = $('apiKey').value.trim();
+  const symbol = $('symbol').value;
+  const interval = $('interval').value;
+  if(!apiKey) throw new Error('Paste your API key first');
+  const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(symbol)}&interval=${interval}&apikey=${apiKey}&outputsize=80`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if(data.status === 'error') throw new Error(data.message || 'API error');
+  if(!Array.isArray(data.values)) throw new Error('No candles returned');
+  return data.values.slice().reverse().map(c => ({
+    datetime: c.datetime,
+    open: parseFloat(c.open),
+    high: parseFloat(c.high),
+    low: parseFloat(c.low),
+    close: parseFloat(c.close)
+  }));
+}
+
+function detectStructure(candles){
+  const last = candles.at(-1), prev = candles.at(-2);
+  if(last.high > prev.high && last.low > prev.low) return 'BULLISH';
+  if(last.high < prev.high && last.low < prev.low) return 'BEARISH';
+  return 'RANGE';
+}
+
+function detectSwingSweep(candles){
+  const last = candles.at(-1);
+  const lookback = candles.slice(-12,-1);
+  const prevHigh = Math.max(...lookback.map(c=>c.high));
+  const prevLow = Math.min(...lookback.map(c=>c.low));
+  if(last.high > prevHigh && last.close < prevHigh) return {type:'SWEEP HIGH', level:prevHigh};
+  if(last.low < prevLow && last.close > prevLow) return {type:'SWEEP LOW', level:prevLow};
+  return {type:'NONE', level:null};
+}
+
+function detectMSS(candles){
+  const last = candles.at(-1);
+  const lows = candles.slice(-8,-1).map(c=>c.low);
+  const highs = candles.slice(-8,-1).map(c=>c.high);
+  const refLow = Math.min(...lows);
+  const refHigh = Math.max(...highs);
+  if(last.close < refLow) return {type:'BEARISH MSS', level:refLow};
+  if(last.close > refHigh) return {type:'BULLISH MSS', level:refHigh};
+  return {type:'NONE', level:null};
+}
+
+function detectDisplacement(candles){
+  const bodySizes = candles.slice(-15,-1).map(c=>Math.abs(c.close-c.open));
+  const avgBody = bodySizes.reduce((a,b)=>a+b,0)/bodySizes.length;
+  const last = candles.at(-1);
+  const lastBody = Math.abs(last.close-last.open);
+  return { strong: lastBody > avgBody * 1.8, size: lastBody, avg: avgBody };
+}
+
+function detectFVG(candles){
+  const c1 = candles.at(-3), c3 = candles.at(-1);
+  if(c3.low > c1.high) return {type:'BULLISH FVG', low:c1.high, high:c3.low};
+  if(c3.high < c1.low) return {type:'BEARISH FVG', low:c3.high, high:c1.low};
+  return {type:'NONE', low:null, high:null};
+}
+
+function dealingRange(candles){
+  const seg = candles.slice(-30);
+  return { high: Math.max(...seg.map(c=>c.high)), low: Math.min(...seg.map(c=>c.low)) };
+}
+
+function premiumDiscount(candles){
+  const dr = dealingRange(candles);
+  const mid = (dr.high + dr.low) / 2;
+  const price = candles.at(-1).close;
+  return { zone: price >= mid ? 'PREMIUM' : 'DISCOUNT', mid, high:dr.high, low:dr.low, price };
+}
+
+function buildSignal(candles){
+  const structure = detectStructure(candles);
+  const sweep = detectSwingSweep(candles);
+  const mss = detectMSS(candles);
+  const displacement = detectDisplacement(candles);
+  const fvg = detectFVG(candles);
+  const pd = premiumDiscount(candles);
+  const last = candles.at(-1);
+  const mode = $('riskMode').value;
+
+  let score = 0;
+  const notes = [];
+
+  if(sweep.type === 'SWEEP LOW'){ score += 2; notes.push('✓ sweep low'); }
+  if(sweep.type === 'SWEEP HIGH'){ score += 2; notes.push('✓ sweep high'); }
+  if(mss.type === 'BULLISH MSS'){ score += 3; notes.push('✓ bullish MSS'); }
+  if(mss.type === 'BEARISH MSS'){ score += 3; notes.push('✓ bearish MSS'); }
+  if(displacement.strong){ score += 2; notes.push('✓ strong displacement'); }
+  if(fvg.type !== 'NONE'){ score += 2; notes.push('✓ valid FVG'); }
+  if(pd.zone === 'DISCOUNT' && (mss.type === 'BULLISH MSS' || structure === 'BULLISH')){ score += 1; notes.push('✓ discount context'); }
+  if(pd.zone === 'PREMIUM' && (mss.type === 'BEARISH MSS' || structure === 'BEARISH')){ score += 1; notes.push('✓ premium context'); }
+
+  let direction = 'WAIT';
+  let decision = 'NO TRADE';
+  let entry = null, sl = null, tp = null;
+
+  if(sweep.type === 'SWEEP LOW' && mss.type === 'BULLISH MSS' && displacement.strong && fvg.type === 'BULLISH FVG'){
+    direction = 'BUY';
+    entry = fvg.low ?? last.close;
+    sl = Math.min(last.low, sweep.level ?? last.low);
+    tp = pd.high;
+  }
+
+  if(sweep.type === 'SWEEP HIGH' && mss.type === 'BEARISH MSS' && displacement.strong && fvg.type === 'BEARISH FVG'){
+    direction = 'SELL';
+    entry = fvg.high ?? last.close;
+    sl = Math.max(last.high, sweep.level ?? last.high);
+    tp = pd.low;
+  }
+
+  const threshold = mode === 'sniper' ? 8 : 6;
+  if(direction !== 'WAIT' && score >= threshold){
+    decision = mode === 'sniper' ? 'SNIPER SETUP' : 'VALID SETUP';
+  }
+
+  let rr = null;
+  if(entry !== null && sl !== null && tp !== null){
+    const risk = Math.abs(entry - sl);
+    const reward = Math.abs(tp - entry);
+    rr = risk > 0 ? (reward / risk) : null;
+  }
+
+  const confidence = Math.min(95, Math.max(5, Math.round((score / 10) * 100)));
+
+  return {structure, sweep, mss, displacement, fvg, pd, decision, direction, score, confidence, entry, sl, tp, rr, notes};
+}
+
+function render(result){
+  $('decision').textContent = result.decision;
+  $('decision').className = result.direction === 'BUY' ? 'good' : result.direction === 'SELL' ? 'bad' : 'info';
+
+  $('direction').innerHTML =
+    result.direction === 'BUY' ? '<span class="pill pill-buy">BUY</span>' :
+    result.direction === 'SELL' ? '<span class="pill pill-sell">SELL</span>' :
+    '<span class="pill pill-wait">WAIT</span>';
+
+  $('confidence').textContent = result.confidence + '%';
+  $('score').textContent = result.score + '/10';
+  $('entry').textContent = fmt(result.entry);
+  $('sl').textContent = fmt(result.sl);
+  $('tp').textContent = fmt(result.tp);
+  $('rr').textContent = result.rr ? result.rr.toFixed(2) : '—';
+
+  $('details').textContent =
+`Structure: ${result.structure}
+Sweep: ${result.sweep.type}${result.sweep.level ? ' @ ' + fmt(result.sweep.level) : ''}
+MSS: ${result.mss.type}${result.mss.level ? ' @ ' + fmt(result.mss.level) : ''}
+Displacement: ${result.displacement.strong ? 'STRONG' : 'WEAK'} (body ${fmt(result.displacement.size)} vs avg ${fmt(result.displacement.avg)})
+FVG: ${result.fvg.type}${result.fvg.low !== null ? ' [' + fmt(result.fvg.low) + ' → ' + fmt(result.fvg.high) + ']' : ''}
+PD Zone: ${result.pd.zone} | Mid ${fmt(result.pd.mid)} | Range ${fmt(result.pd.low)} → ${fmt(result.pd.high)}
+
+Reasons:
+${result.notes.length ? result.notes.map(x => '- ' + x).join('\n') : '- no strong ICT alignment yet'}`;
+}
+
+async function runSignalEngine(){
+  try{
+    $('details').textContent = 'Fetching candles and analyzing...';
+    const candles = await fetchCandles();
+    render(buildSignal(candles));
+  }catch(err){
+    $('details').textContent = 'Error: ' + err.message;
+  }
+}
+
+function autoLoop(){
+  stopLoop();
+  runSignalEngine();
+  loopId = setInterval(runSignalEngine, minRefreshMs());
+  $('usageNote').textContent = 'Auto refresh ON.';
+}
+
+function stopLoop(){
+  if(loopId){ clearInterval(loopId); loopId = null; }
+  $('usageNote').textContent = 'Auto refresh OFF.';
+}
+
+$('saveKeyBtn').addEventListener('click', saveKey);
+$('runBtn').addEventListener('click', runSignalEngine);
+$('autoBtn').addEventListener('click', autoLoop);
+$('stopBtn').addEventListener('click', stopLoop);
+
+loadKey();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js')
+    .then(() => $('pwaStatus').textContent = 'PWA status: ready for install')
+    .catch(() => $('pwaStatus').textContent = 'PWA status: service worker not available');
+} else {
+  $('pwaStatus').textContent = 'PWA status: browser does not support service worker';
+}
+</script>
+</body>
+</html>
